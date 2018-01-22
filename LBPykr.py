@@ -3,7 +3,7 @@
 """
 本プログラムは下記の論文内容を一部再現したものです.
 使用するパッチ画像等は下記URLよりダウンロードしてください.
-判別方法：ユークリッド距離から算出された画像同士の値をk-meansにより分類
+判別方法：ユークリッド距離から算出された画像同士の値をK最近傍法により分類
 
 論文名
 Quantitative Analysis of Pulmonary Emphysema Using Local Binary Patterns
@@ -24,10 +24,10 @@ def main():
   histfile= 'LBPykr_1_Histgram.csv'
   ykrfile = 'LBPykr_2_EuclidDis.csv'
   resfile = 'LBPykr_3_Similarity.csv'
-  kmefile = 'LBPykr_4_K-means.csv'
-  akmfile = 'LBPykr_5_diff_K-means.csv'
+  knnfile = 'LBPykr_4_KNN.csv'
+  aknfile = 'LBPykr_5_diff_KNN.csv'
   
-  # k-meansの個数
+  # K Nearest Neighborの個数
   knum=20
 	# パッチ画像のラベル閾値
   label_1=60
@@ -86,7 +86,7 @@ def main():
         for j in range(0,img_ver):     
           # reset array
           mask=[0 for col in range(points)]
-          lbp_img[i][j]=2**8-1
+          lbp_img[i][j]=2**points-1
           # when ( left / right / top / bottom ) exist, calc LBP
           if i>radius and i+radius<img_ver and  j>radius and j+radius<img_hor  :
             
@@ -110,6 +110,10 @@ def main():
               #print ('val: '+str(lbp_img[i][j])),
               lbp_img[i][j]=min(lbp_img[i][j],lbp_val)
               #print ('-> '+str(lbp_img[i][j]))
+
+
+            # 256色の濃淡レベルに変換後, 格納
+            #lbp_img[i][j] = int(lbp_val/(2**abs(8-points)))
 
       #---- end LBP loop --------------------------------#
  
@@ -193,18 +197,18 @@ def main():
       print ('{:<5}'
         .format(str(int(res[i][j]))+" >")),    
     print ('\nSimilarity: ' + str(i+1) + 'pic')
-  print('try k-means measurement')
+  print('try K Nearest Neighbor')
 
-  #--- k-means法によるラベル判定 ---#
+  #--- K最近傍法によるラベル判定 ---#
   # image #0-59:NT, 60-109:CLE, 110-168:PSE 
   #print ('temp\n How many k?')
   #knum=int(raw_input('>>>')) 
   knum=len(ykr)
-  all_kmeans = [0 for col in range(knum)]
+  all_knn = [0 for col in range(knum)]
   max_accus = 0.0
 
   for knum in range (knum):
-    kmeans = [[0 for col in range(2)]  for row in range(len(ykr))]
+    knn = [[0 for col in range(2)]  for row in range(len(ykr))]
     accu=0.0
     for i in range(len(ykr)):
       # patch -> NT(#0),CLE(#1),PSE(#2) class
@@ -221,14 +225,14 @@ def main():
           PatchClass[2][1]+=1
       # 3種の中で一番高いものノラベルに推定
       if PatchClass[0][1]>PatchClass[1][1] and PatchClass[0][1]>PatchClass[2][1]:
-        kmeans[i][1]=1
+        knn[i][1]=1
       elif PatchClass[1][1]>PatchClass[0][1] and PatchClass[1][1]>PatchClass[2][1]:
-        kmeans[i][1]=2
+        knn[i][1]=2
       #else:
-       # kmeans[i][1]=3
+       # knn[i][1]=3
       
       elif PatchClass[2][1]>PatchClass[0][1] and PatchClass[2][1]>PatchClass[1][1]:
-        kmeans[i][1]=3
+        knn[i][1]=3
       # 同値だった場合の処理(同値が解消されるまでkの値を延長)
       else:    
         PatchClass.sort(key=lambda x:x[1])
@@ -248,41 +252,41 @@ def main():
                 PatchClass[a][1]+=1
           add+=1  
           PatchClass.sort(key=lambda x:x[1])
-        kmeans[i][1]=PatchClass[1][0]+1
+        knn[i][1]=PatchClass[1][0]+1
       
       # ラベル付け (上記URLより)
       if i<label_1:
-        kmeans[i][0]=1
+        knn[i][0]=1
       elif i<label_2:
-        kmeans[i][0]=2
+        knn[i][0]=2
       else:
-        kmeans[i][0]=3
+        knn[i][0]=3
       # ラベルと合致していたら精度++
-      if kmeans[i][0]==kmeans[i][1]:
+      if knn[i][0]==knn[i][1]:
         accu+=1
     accu/=len(ykr)
-    all_kmeans[knum]=accu
+    all_knn[knum]=accu
     if max_accus < accu:
       max_accus=accu
       max_accu_num=knum
     
-  # k-meansファイルの出力用
+  # K Nearest Neighborファイルの出力用
   try:
-    with open(kmefile,'w') as fk:
+    with open(knnfile,'w') as fk:
       writer = csv.writer(fk)
-      writer.writerows(kmeans)
+      writer.writerows(knn)
     fk.close()
   except:
-    print ('\nerror!\nabout: file ' + kmefile )
+    print ('\nerror!\nabout: file ' + knnfile )
   
-  # all_k-meansファイルの出力用 #
+  # all_knnファイルの出力用 #
   try:
-    with open(akmfile,'w') as fa:
+    with open(aknfile,'w') as fa:
       writer = csv.writer(fa)
-      writer.writerow(all_kmeans)
+      writer.writerow(all_knn)
     fa.close()
   except:
-    print ('\nerror!\nabout: file ' + akmfile )
+    print ('\nerror!\nabout: file ' + aknfile )
 
   print ('\nMax accuracy: #'+str(max_accu_num-1)+' '+str(max_accus)+'\n\nfinish')
 
@@ -296,5 +300,5 @@ if __name__ == '__main__':
 
 __author__ = "Taka.N"
 __version__ = "0.8"
-__date__    = "15 January 2018"
+__date__    = "19 January 2018"
 
